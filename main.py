@@ -4,7 +4,6 @@ import requests
 from PIL import Image
 from io import BytesIO
 from datetime import datetime
-import json
 
 # OpenAI API Key
 openai.api_key = st.secrets["OpenAI_API"]["Key"]
@@ -122,8 +121,8 @@ with st.sidebar:
             # 画像をバイトデータとして保存
             img_bytes = uploaded_file.getvalue()
 
-            # 図鑑データを保存（セッションに保存しておく）
-            zukan_entry = {
+            # 図鑑データをセッションに保存する準備（保存はまだしない）
+            st.session_state["zukan_entry"] = {
                 "animal_name": animal_name,
                 "scientific_name": scientific_name,
                 "capture_location": capture_location,
@@ -132,7 +131,6 @@ with st.sidebar:
                 "description": description,
                 "image": img_bytes.hex()  # 画像を16進数文字列に変換して保存
             }
-            save_to_session_state(zukan_entry)
 
             # 図鑑の内容を表示
             st.session_state["zukan_created"] = True
@@ -144,7 +142,7 @@ tab1, tab2 = st.tabs(["図鑑作成", "保存された図鑑一覧"])
 
 with tab1:
     if "zukan_created" in st.session_state and st.session_state["zukan_created"]:
-        entry = st.session_state["zukan_data"][-1]
+        entry = st.session_state["zukan_entry"]
         
         st.subheader(f"名前: {entry['animal_name']}")
         st.subheader(f"学名: {entry['scientific_name']}")
@@ -156,7 +154,8 @@ with tab1:
         st.subheader("説明")
         st.write(entry['description'])
 
-        if st.button("図鑑を保存"):
+        if st.button("この図鑑を保存"):
+            save_to_session_state(entry)
             st.success("図鑑が保存されました！")
             st.session_state["zukan_created"] = False
     else:
