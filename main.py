@@ -46,7 +46,7 @@ def get_weather(date, location):
 def generate_description(animal_name):
     prompt = f"以下の動物の説明文を、ポケモン図鑑風に作成してください。動物名は{animal_name}です。"
     response = openai.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "あなたはポケモン図鑑のスタイルで動物の説明を作成するAIアシスタントです。"},
             {"role": "user", "content": prompt}
