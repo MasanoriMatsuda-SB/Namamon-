@@ -1,8 +1,6 @@
-steamlit
+streamlit
 openai
 requests
-Image
-BytesIO
 datetime
 json
 os
