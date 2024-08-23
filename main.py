@@ -46,14 +46,14 @@ def get_weather(date, location):
 # 説明文を生成する関数
 def generate_description(animal_name):
     prompt = f"以下の動物の説明文を、ポケモン図鑑風に作成してください。動物名は{animal_name}です。"
-    response = openai.ChatCompletion.create(
+    response = openai.chat.completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "あなたはポケモン図鑑のスタイルで動物の説明を作成するAIアシスタントです。"},
             {"role": "user", "content": prompt}
         ]
     )
-    output_content = response.choices[0].message['content'].strip()
+    output_content = response.choices[0].message.content.strip()
     return output_content
 
 # 日本語名を英語名に翻訳する関数
