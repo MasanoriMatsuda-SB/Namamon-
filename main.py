@@ -5,7 +5,6 @@ from PIL import Image
 from io import BytesIO
 from datetime import datetime
 import json
-import os
 
 # OpenAI API Key
 openai.api_key = st.secrets["OpenAI_API"]["Key"]
@@ -18,9 +17,6 @@ google_translate_api_key = st.secrets["Google_Translate_API"]["Key"]
 
 # GBIF API URL
 gbif_api_url = "https://api.gbif.org/v1/species/search?q="
-
-# 保存ファイルのパス
-SAVE_PATH = "zukan_data.json"
 
 # 天気情報を取得する関数
 def get_weather(date, location):
@@ -50,14 +46,14 @@ def get_weather(date, location):
 # 説明文を生成する関数
 def generate_description(animal_name):
     prompt = f"以下の動物の説明文を、ポケモン図鑑風に作成してください。動物名は{animal_name}です。"
-    response = openai.chat.completions.create(
+    response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "あなたはポケモン図鑑のスタイルで動物の説明を作成するAIアシスタントです。"},
             {"role": "user", "content": prompt}
         ]
     )
-    output_content = response.choices[0].message.content.strip()
+    output_content = response.choices[0].message['content'].strip()
     return output_content
 
 # 日本語名を英語名に翻訳する関数
@@ -92,26 +88,11 @@ def get_scientific_name(animal_name):
     except Exception as e:
         return f"エラーが発生しました: {str(e)}"
 
-# 図鑑データを保存する関数
-def save_zukan(data):
-    if os.path.exists(SAVE_PATH):
-        with open(SAVE_PATH, "r") as f:
-            existing_data = json.load(f)
-    else:
-        existing_data = []
-
-    existing_data.append(data)
-
-    with open(SAVE_PATH, "w") as f:
-        json.dump(existing_data, f, ensure_ascii=False, indent=4)
-
-# 保存された図鑑データを読み込む関数
-def load_zukan():
-    if os.path.exists(SAVE_PATH):
-        with open(SAVE_PATH, "r") as f:
-            return json.load(f)
-    else:
-        return []
+# Session Stateを使って図鑑データを保存する関数
+def save_to_session_state(data):
+    if "zukan_data" not in st.session_state:
+        st.session_state["zukan_data"] = []
+    st.session_state["zukan_data"].append(data)
 
 # Streamlitアプリのレイアウト
 st.set_page_config(page_title="Namamon図鑑", layout="wide")
@@ -142,7 +123,7 @@ with st.sidebar:
             img_bytes = uploaded_file.getvalue()
 
             # 図鑑データを保存（セッションに保存しておく）
-            st.session_state["zukan_entry"] = {
+            zukan_entry = {
                 "animal_name": animal_name,
                 "scientific_name": scientific_name,
                 "capture_location": capture_location,
@@ -151,6 +132,7 @@ with st.sidebar:
                 "description": description,
                 "image": img_bytes.hex()  # 画像を16進数文字列に変換して保存
             }
+            save_to_session_state(zukan_entry)
 
             # 図鑑の内容を表示
             st.session_state["zukan_created"] = True
@@ -162,7 +144,7 @@ tab1, tab2 = st.tabs(["図鑑作成", "保存された図鑑一覧"])
 
 with tab1:
     if "zukan_created" in st.session_state and st.session_state["zukan_created"]:
-        entry = st.session_state["zukan_entry"]
+        entry = st.session_state["zukan_data"][-1]
         
         st.subheader(f"名前: {entry['animal_name']}")
         st.subheader(f"学名: {entry['scientific_name']}")
@@ -174,8 +156,7 @@ with tab1:
         st.subheader("説明")
         st.write(entry['description'])
 
-        if st.button("この図鑑を保存"):
-            save_zukan(entry)
+        if st.button("図鑑を保存"):
             st.success("図鑑が保存されました！")
             st.session_state["zukan_created"] = False
     else:
@@ -183,14 +164,16 @@ with tab1:
 
 with tab2:
     st.subheader("保存された図鑑一覧")
-    zukan_data = load_zukan()
-    for entry in zukan_data:
-        st.subheader(f"名前: {entry['animal_name']}")
-        st.subheader(f"学名: {entry['scientific_name']}")
-        st.image(BytesIO(bytes.fromhex(entry["image"])), caption=entry['animal_name'], use_column_width=True)
-        st.write(f"場所: {entry['capture_location']}")
-        st.write(f"日時: {entry['capture_date']}")
-        st.write(f"天気: {entry['weather']}")
-        st.write("説明:")
-        st.write(entry['description'])
-        st.write("---")
+    if "zukan_data" in st.session_state:
+        for entry in st.session_state["zukan_data"]:
+            st.subheader(f"名前: {entry['animal_name']}")
+            st.subheader(f"学名: {entry['scientific_name']}")
+            st.image(BytesIO(bytes.fromhex(entry["image"])), caption=entry['animal_name'], use_column_width=True)
+            st.write(f"場所: {entry['capture_location']}")
+            st.write(f"日時: {entry['capture_date']}")
+            st.write(f"天気: {entry['weather']}")
+            st.write("説明:")
+            st.write(entry['description'])
+            st.write("---")
+    else:
+        st.write("保存された図鑑がまだありません。")
