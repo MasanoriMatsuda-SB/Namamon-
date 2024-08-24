@@ -3,44 +3,22 @@ import openai
 import requests
 from PIL import Image
 from io import BytesIO
-from datetime import datetime
+from datetime import datetime, time
+from geopy.geocoders import GoogleV3
+from geopy.exc import GeocoderQueryError, GeocoderTimedOut
+import folium
+from streamlit_folium import st_folium
 
-# OpenAI API Key
+# APIキー設定
 openai.api_key = st.secrets["OpenAI_API"]["Key"]
-
-# OpenWeatherMap API Key
 weather_api_key = st.secrets["OpenWeatherMap_API"]["Key"]
-
-# Google Translate API Key
 google_translate_api_key = st.secrets["Google_Translate_API"]["Key"]
+google_api_key = st.secrets["GoogleMaps_API"]["Key"]
+
+geolocator = GoogleV3(api_key=google_api_key)
 
 # GBIF API URL
 gbif_api_url = "https://api.gbif.org/v1/species/search?q="
-
-# 天気情報を取得する関数
-def get_weather(date, location):
-    try:
-        geocode_url = f'http://api.openweathermap.org/geo/1.0/direct?q={location}&limit=1&appid={weather_api_key}'
-        geocode_response = requests.get(geocode_url)
-        geocode_data = geocode_response.json()
-
-        if len(geocode_data) == 0:
-            return "指定された場所の情報が見つかりませんでした"
-
-        lat = geocode_data[0]['lat']
-        lon = geocode_data[0]['lon']
-        
-        weather_url = f'https://api.openweathermap.org/data/2.5/onecall/timemachine?lat={lat}&lon={lon}&dt={int(datetime.strptime(date, "%Y-%m-%d").timestamp())}&appid={weather_api_key}&lang=ja&units=metric'
-        weather_response = requests.get(weather_url)
-        weather_data = weather_response.json()
-
-        if 'current' in weather_data:
-            return weather_data['current']['weather'][0]['description']
-        else:
-            return "天気情報が見つかりませんでした"
-
-    except Exception as e:
-        return f"エラーが発生しました: {str(e)}"
 
 # 説明文を生成する関数
 def generate_description(animal_name):
@@ -87,6 +65,26 @@ def get_scientific_name(animal_name):
     except Exception as e:
         return f"エラーが発生しました: {str(e)}"
 
+# 天気情報を取得する関数
+def get_weather(date_str, location):
+    try:
+        location = geolocator.geocode(location)
+        if location:
+            lat, lon = location.latitude, location.longitude
+            url = f"http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={weather_api_key}&units=metric&lang=ja"
+            response = requests.get(url)
+            if response.status_code == 200:
+                weather_data = response.json()
+                weather_description = weather_data['weather'][0]['description']
+                temp = weather_data['main']['temp']
+                return f"{weather_description}, {temp}°C"
+            else:
+                return f"エラーが発生しました。ステータスコード: {response.status_code}"
+        else:
+            return "位置情報が取得できませんでした"
+    except Exception as e:
+        return f"エラーが発生しました: {str(e)}"
+
 # Session Stateを使って図鑑データを保存する関数
 def save_to_session_state(data):
     if "zukan_data" not in st.session_state:
@@ -102,26 +100,37 @@ with st.sidebar:
     st.header("図鑑情報の入力")
     animal_name = st.text_input("動物名")
     capture_location = st.text_input("捕獲場所")
-    capture_date = st.date_input("捕獲日")
+    capture_date = st.date_input('捕獲日', value=datetime.today())
     capture_time = st.time_input("捕獲時刻")
     uploaded_file = st.file_uploader("動物の画像をアップロード", type=["png", "jpg", "jpeg"])
+   
+    # 住所から緯度・経度を取得し、マッピング
+    latitude, longitude = None, None
+   
+    if capture_location:
+        try:
+            location = geolocator.geocode(capture_location, timeout=10)
+            if location:
+                latitude = location.latitude
+                longitude = location.longitude
+            else:
+                st.write("住所が見つかりませんでした。住所が正しいか確認してください。")
+        except GeocoderQueryError:
+            st.write("ジオコーディングリクエストが無効です。")
+        except GeocoderTimedOut:
+            st.write("ジオコーディングリクエストがタイムアウトしました。")
+        except Exception as e:
+            st.write(f"予期しないエラーが発生しました: {e}")
 
     if st.button("図鑑を作成"):
         if animal_name and capture_location and capture_date and capture_time and uploaded_file:
-            # 天気情報を取得
             full_datetime = datetime.combine(capture_date, capture_time)
             weather = get_weather(capture_date.strftime('%Y-%m-%d'), capture_location)
             
-            # 説明文を生成
             description = generate_description(animal_name)
-
-            # 学名を取得
             scientific_name = get_scientific_name(animal_name)
-            
-            # 画像をバイトデータとして保存
             img_bytes = uploaded_file.getvalue()
 
-            # 図鑑データをセッションに保存する準備（保存はまだしない）
             st.session_state["zukan_entry"] = {
                 "animal_name": animal_name,
                 "scientific_name": scientific_name,
@@ -129,10 +138,9 @@ with st.sidebar:
                 "capture_date": full_datetime.strftime('%Y-%m-%d %H:%M'),
                 "weather": weather,
                 "description": description,
-                "image": img_bytes.hex()  # 画像を16進数文字列に変換して保存
+                "image": img_bytes.hex()
             }
 
-            # 図鑑の内容を表示
             st.session_state["zukan_created"] = True
         else:
             st.error("全てのフィールドを入力し、画像をアップロードしてください。")
@@ -153,6 +161,12 @@ with tab1:
         st.write(f"天気: {entry['weather']}")
         st.subheader("説明")
         st.write(entry['description'])
+
+        st.subheader("捕獲場所-Map-")
+        if latitude and longitude:
+            map_obj = folium.Map(location=[latitude, longitude], zoom_start=13)
+            folium.Marker([latitude, longitude], popup='捕獲場所').add_to(map_obj)
+            st_folium(map_obj, width=700, height=500)
 
         if st.button("この図鑑を保存"):
             save_to_session_state(entry)
@@ -175,4 +189,4 @@ with tab2:
             st.write(entry['description'])
             st.write("---")
     else:
-        st.write("保存された図鑑がまだありません。")
+        st.write("保存された図鑑はありません。")
