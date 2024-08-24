@@ -1,3 +1,6 @@
 streamlit
 openai
 requests
+geopy
+folium
+streamlit_folium
