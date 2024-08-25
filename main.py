@@ -50,7 +50,7 @@ def translate_to_english(japanese_name):
 
 # OpenAIを使用して説明文を生成する関数
 def generate_description(animal_name):
-    prompt = f"以下の動物の説明文を、ポケモン図鑑風に作成してください。動物名は{animal_name}です。"
+    prompt = f"以下の動物の説明文を、ポケモン図鑑風に作成してください。動物名は{animal_name}です。例文を参考にお願いします。例文：森の中で仲間と暮らす。ほっぺたの両側にある電気袋に電気を溜める。"
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -168,7 +168,8 @@ with tab1:
         st.subheader("説明")
         st.write(entry['description'])
 
-        # 住所情報に基づいてマップを表示
+        # 住所情報に基づいてマップを表示し、「分布」のタイトルを付ける
+        st.subheader("分布")
         map_display = folium.Map(location=[entry['lat'], entry['lon']], zoom_start=10)
         folium.Marker(location=[entry['lat'], entry['lon']], popup=entry['capture_location']).add_to(map_display)
         st_folium(map_display, width=700, height=500)
@@ -189,7 +190,8 @@ with tab2:
             st.write(f"気温: {entry['temperature']}°C")
             st.write(f"説明: {entry['description']}")
 
-            # 保存された図鑑の場所を示すマップを表示
+            # 保存された図鑑の場所を示すマップを表示し、「分布」のタイトルを付ける
+            st.subheader("分布")
             map_display = folium.Map(location=[entry['lat'], entry['lon']], zoom_start=10)
             folium.Marker(location=[entry['lat'], entry['lon']], popup=entry['capture_location']).add_to(map_display)
             st_folium(map_display, width=700, height=500)
