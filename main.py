@@ -19,12 +19,10 @@ gbif_api_url = "https://api.gbif.org/v1/species/search?q="
 # 学名を取得する関数
 def get_scientific_name(animal_name):
     try:
-        # 日本語名を英語に翻訳
         english_name = translate_to_english(animal_name)
         if english_name == "翻訳できませんでした":
             return "学名が見つかりませんでした"
         
-        # GBIF APIで学名を検索
         response = requests.get(gbif_api_url + english_name)
         data = response.json()
         if data['results']:
@@ -76,10 +74,10 @@ def get_address(lat, lon):
     return response.json()
 
 # Streamlitアプリのレイアウト
-st.set_page_config(page_title="動物図鑑作成アプリ", layout="wide")
-st.title("動物図鑑作成アプリ")
+st.set_page_config(page_title="Namamon図鑑", layout="wide")
+st.title("Namamon図鑑")
 
-# サイドバーに入力フィールドを配置
+# サイドバーに入力フィールドと保存ボタンを配置
 with st.sidebar:
     st.header("図鑑情報の入力")
     animal_name = st.text_input("動物名")
@@ -96,6 +94,7 @@ with st.sidebar:
     capture_location_value = None
     weather = None
     temperature = None
+    clicked_lat, clicked_lon = 35.0, 135.0
 
     if map_data is not None and 'last_clicked' in map_data and map_data['last_clicked'] is not None:
         clicked_lat = map_data['last_clicked']['lat']
@@ -118,17 +117,7 @@ with st.sidebar:
                 st.error("天気情報の取得に失敗しました。")
         else:
             st.write("住所の取得に失敗しました。")
-    else:
-        clicked_lat = 35.0
-        clicked_lon = 135.0
 
-    lat = st.number_input('緯度', value=clicked_lat, key='lat_input')
-    lon = st.number_input('経度', value=clicked_lon, key='lon_input')
-
-# メインコンテンツのレイアウト
-tab1, tab2 = st.tabs(["図鑑作成", "保存された図鑑一覧"])
-
-with tab1:
     if st.button("図鑑を作成"):
         if animal_name and capture_location_value and capture_date and capture_time and uploaded_file:
             description = generate_description(animal_name)
@@ -144,13 +133,27 @@ with tab1:
                 "weather": weather,
                 "temperature": temperature,
                 "description": description,
-                "image": img_bytes.hex()
+                "image": img_bytes.hex(),
+                "lat": clicked_lat,
+                "lon": clicked_lon
             }
 
             st.session_state["zukan_created"] = True
         else:
             st.error("全てのフィールドを入力し、画像をアップロードしてください。")
 
+    # 保存ボタンを追加
+    if "zukan_created" in st.session_state and st.session_state["zukan_created"]:
+        if st.button("この図鑑を保存"):
+            if "zukan_data" not in st.session_state:
+                st.session_state["zukan_data"] = []
+            st.session_state["zukan_data"].append(st.session_state["zukan_entry"])
+            st.success("図鑑が保存されました！")
+            st.session_state["zukan_created"] = False
+
+# メインコンテンツのレイアウト
+tab1, tab2 = st.tabs(["図鑑作成", "保存された図鑑一覧"])
+with tab1:
     if "zukan_created" in st.session_state and st.session_state["zukan_created"]:
         entry = st.session_state["zukan_entry"]
         
@@ -165,12 +168,10 @@ with tab1:
         st.subheader("説明")
         st.write(entry['description'])
 
-        if st.button("この図鑑を保存"):
-            if "zukan_data" not in st.session_state:
-                st.session_state["zukan_data"] = []
-            st.session_state["zukan_data"].append(entry)
-            st.success("図鑑が保存されました！")
-            st.session_state["zukan_created"] = False
+        # 住所情報に基づいてマップを表示
+        map_display = folium.Map(location=[entry['lat'], entry['lon']], zoom_start=10)
+        folium.Marker(location=[entry['lat'], entry['lon']], popup=entry['capture_location']).add_to(map_display)
+        st_folium(map_display, width=700, height=500)
     else:
         st.write("サイドバーから図鑑情報を入力し、図鑑を作成してください。")
 
@@ -187,5 +188,10 @@ with tab2:
             st.write(f"天気: {entry['weather']}")
             st.write(f"気温: {entry['temperature']}°C")
             st.write(f"説明: {entry['description']}")
+
+            # 保存された図鑑の場所を示すマップを表示
+            map_display = folium.Map(location=[entry['lat'], entry['lon']], zoom_start=10)
+            folium.Marker(location=[entry['lat'], entry['lon']], popup=entry['capture_location']).add_to(map_display)
+            st_folium(map_display, width=700, height=500)
     else:
         st.write("保存された図鑑はありません。")
