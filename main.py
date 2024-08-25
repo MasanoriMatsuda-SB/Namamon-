@@ -76,8 +76,8 @@ def get_address(lat, lon):
     return response.json()
 
 # Streamlitアプリのレイアウト
-st.set_page_config(page_title="Namamon図鑑", layout="wide")
-st.title("Namamon図鑑")
+st.set_page_config(page_title="動物図鑑作成アプリ", layout="wide")
+st.title("動物図鑑作成アプリ")
 
 # サイドバーに入力フィールドを配置
 with st.sidebar:
@@ -125,6 +125,10 @@ with st.sidebar:
     lat = st.number_input('緯度', value=clicked_lat, key='lat_input')
     lon = st.number_input('経度', value=clicked_lon, key='lon_input')
 
+# メインコンテンツのレイアウト
+tab1, tab2 = st.tabs(["図鑑作成", "保存された図鑑一覧"])
+
+with tab1:
     if st.button("図鑑を作成"):
         if animal_name and capture_location_value and capture_date and capture_time and uploaded_file:
             description = generate_description(animal_name)
@@ -147,9 +151,6 @@ with st.sidebar:
         else:
             st.error("全てのフィールドを入力し、画像をアップロードしてください。")
 
-# メインコンテンツのレイアウト
-tab1, tab2 = st.tabs(["図鑑作成", "保存された図鑑一覧"])
-with tab1:
     if "zukan_created" in st.session_state and st.session_state["zukan_created"]:
         entry = st.session_state["zukan_entry"]
         
