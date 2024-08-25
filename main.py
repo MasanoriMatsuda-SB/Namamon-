@@ -194,6 +194,6 @@ with tab2:
             st.subheader("分布")
             map_display = folium.Map(location=[entry['lat'], entry['lon']], zoom_start=10)
             folium.Marker(location=[entry['lat'], entry['lon']], popup=entry['capture_location']).add_to(map_display)
-            st_folium(map_display, width=700, height=500)
+            map_html = st_folium(map_display, width=700, height=500)
     else:
         st.write("保存された図鑑はありません。")
