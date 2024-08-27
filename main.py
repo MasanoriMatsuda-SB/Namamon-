@@ -48,9 +48,21 @@ def translate_to_english(japanese_name):
     else:
         return "翻訳できませんでした"
 
+content_kind_of = {
+    "ポケモン博士": "ポケモン図鑑風に動植物を紹介してください。例文を参考にお願いします。例文：森の中で仲間と暮らす。ほっぺたの両側にある電気袋に電気を溜める。",
+    
+    "小学校の先生": "小学生向けに、わかりやすくて楽しいトーンで動植物を紹介してください。子供たちが興味を持つように、日常生活に結びつけた簡単な豆知識や観察のコツも教えてください。",
+    
+    "次々探索したくさせる先生": "小学生向けに、わかりやすく楽しいトーンで動植物を紹介してください。さらに、他の動植物も探索したくなるように関連する他の動植物の名前と見つけ方のコツを合わせて提案してください",
+    
+    "さかなクン": "さかなクンの明るく親しみやすいトーンで、動植物を紹介してください。冒頭に『ギョギョギョ～！』をつけて、子供たちがワクワクするような楽しい表現や擬音を交えながら説明してください。",
+    
+    "レア度を5段階評価する動植物マニア": "動物の希少性を5段階で評価する動植物マニアとして、動植物を紹介してください。冒頭に5段階の評価結果を伝え、改行して希少性の背景や動植物の特徴を説明してください",
+}
+
 # OpenAIを使用して説明文を生成する関数
-def generate_description(animal_name):
-    prompt = f"以下の動物の説明文を、ポケモン図鑑風に作成してください。動物名は{animal_name}です。例文を参考にお願いします。例文：森の中で仲間と暮らす。ほっぺたの両側にある電気袋に電気を溜める。"
+def generate_description(animal_name, description_style, max_length):
+    prompt = f"次の動物の説明文を、{description_style}動物名は{animal_name}です。{max_length}文字以内でお願いします。"
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -84,6 +96,9 @@ with st.sidebar:
     capture_date = st.date_input("捕獲日")
     capture_time = st.time_input("捕獲時刻")
     uploaded_file = st.file_uploader("動物の画像をアップロード", type=["png", "jpg", "jpeg"])
+    content_kind_of_to_gpt = st.sidebar.selectbox("説明する人物",options=content_kind_of)
+    content_maxStr_to_gpt = str(st.sidebar.slider('説明文字数の上限', 100,200,300))
+
 
     # 地図を表示して捕獲場所を選択
     m = folium.Map(location=[35.0, 135.0], zoom_start=5)
@@ -120,7 +135,7 @@ with st.sidebar:
 
     if st.button("図鑑を作成"):
         if animal_name and capture_location_value and capture_date and capture_time and uploaded_file:
-            description = generate_description(animal_name)
+            description = generate_description(animal_name, content_kind_of[content_kind_of_to_gpt], content_maxStr_to_gpt)
             scientific_name = get_scientific_name(animal_name)
             img_bytes = uploaded_file.getvalue()
             full_datetime = datetime.combine(capture_date, capture_time)
